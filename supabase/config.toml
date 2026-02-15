@@ -2,3 +2,6 @@ project_id = "gnhxotxraytofdvqjrjs"
 
 [functions.fetch-trending]
 verify_jwt = false
+
+[functions.search-repos]
+verify_jwt = false

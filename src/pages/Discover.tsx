@@ -5,14 +5,12 @@ import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Star, ExternalLink, TrendingUp, Plus, Loader2, GitFork } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Star, ExternalLink, TrendingUp, Plus, Loader2, GitFork, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { AddRepoDialog } from "@/components/AddRepoDialog";
 
 interface TrendingRepo {
   github_id: number;
@@ -96,9 +94,6 @@ const PERIODS = [
 export default function Discover() {
   const [topic, setTopic] = useState("ai-ml");
   const [period, setPeriod] = useState("weekly");
-  const [manualUrl, setManualUrl] = useState("");
-  const [manualDesc, setManualDesc] = useState("");
-  const [manualNotes, setManualNotes] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -135,16 +130,13 @@ export default function Discover() {
       description,
       language,
       topics,
-      notes,
     }: {
       name: string;
       remoteUrl: string;
       description?: string;
       language?: string;
       topics?: string[];
-      notes?: string;
     }) => {
-      // First create the repo entry
       const { data: repo, error: repoErr } = await supabase
         .from("repositories")
         .insert({
@@ -158,14 +150,12 @@ export default function Discover() {
         .single();
       if (repoErr) throw repoErr;
 
-      // Then star it
       const { error: starErr } = await supabase.from("starred_repos").insert({
         user_id: user!.id,
         repo_id: repo.id,
         description: description || null,
         language: language || null,
         tags: topics || [],
-        personal_notes: notes || null,
       });
       if (starErr) throw starErr;
     },
@@ -181,21 +171,6 @@ export default function Discover() {
     },
   });
 
-  const handleSaveManual = () => {
-    if (!manualUrl.trim()) return;
-    const name = manualUrl.replace(/https?:\/\/github\.com\//, "").replace(/\.git$/, "") || manualUrl;
-    saveRepo.mutate({
-      name,
-      remoteUrl: manualUrl,
-      description: manualDesc || undefined,
-      notes: manualNotes || undefined,
-    });
-    setManualUrl("");
-    setManualDesc("");
-    setManualNotes("");
-    setDialogOpen(false);
-  };
-
   const trendingRepos: TrendingRepo[] = trendingData?.repos || [];
 
   return (
@@ -205,54 +180,15 @@ export default function Discover() {
           <h1 className="text-xl sm:text-2xl font-bold">Discover</h1>
           <p className="text-xs sm:text-sm text-muted-foreground">Trending repos & save awesome finds</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm" variant="outline" className="w-full sm:w-auto">
-              <Plus className="mr-1.5 h-4 w-4" />
-              Add Repo Manually
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Save a Repo</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="space-y-2">
-                <Label>GitHub URL</Label>
-                <Input
-                  placeholder="https://github.com/owner/repo"
-                  value={manualUrl}
-                  onChange={(e) => setManualUrl(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Description (optional)</Label>
-                <Input
-                  placeholder="What makes this repo awesome?"
-                  value={manualDesc}
-                  onChange={(e) => setManualDesc(e.target.value)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Personal Notes (optional)</Label>
-                <Textarea
-                  placeholder="Your notes..."
-                  value={manualNotes}
-                  onChange={(e) => setManualNotes(e.target.value)}
-                  rows={3}
-                />
-              </div>
-              <Button
-                onClick={handleSaveManual}
-                disabled={!manualUrl.trim() || saveRepo.isPending}
-                className="w-full"
-              >
-                {saveRepo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4" />}
-                Save to Stars
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button size="sm" variant="outline" className="w-full sm:w-auto" onClick={() => setDialogOpen(true)}>
+          <Search className="mr-1.5 h-4 w-4" />
+          Find & Save Repo
+        </Button>
+        <AddRepoDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          savedRepoUrls={starredRepoUrls instanceof Set ? starredRepoUrls : new Set()}
+        />
       </div>
 
       {/* Filters */}
