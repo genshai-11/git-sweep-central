@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/useAuth";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink } from "lucide-react";
+import { Search, ExternalLink, Star } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 const statusColors: Record<string, string> = {
   synced: "bg-success text-success-foreground",
@@ -19,6 +22,9 @@ export default function Repos() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [accountFilter, setAccountFilter] = useState("all");
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { data: repos = [] } = useQuery({
     queryKey: ["repositories"],
@@ -26,6 +32,35 @@ export default function Repos() {
       const { data, error } = await supabase.from("repositories").select("*").order("name");
       if (error) throw error;
       return data;
+    },
+  });
+
+  const { data: starredRepoIds = new Set<string>() } = useQuery({
+    queryKey: ["starred-repo-ids"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("starred_repos").select("repo_id");
+      if (error) throw error;
+      return new Set(data.map((s) => s.repo_id));
+    },
+  });
+
+  const toggleStar = useMutation({
+    mutationFn: async ({ repoId, isStarred }: { repoId: string; isStarred: boolean }) => {
+      if (isStarred) {
+        const { error } = await supabase.from("starred_repos").delete().eq("repo_id", repoId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("starred_repos").insert({ repo_id: repoId, user_id: user!.id });
+        if (error) throw error;
+      }
+    },
+    onSuccess: (_, { isStarred }) => {
+      queryClient.invalidateQueries({ queryKey: ["starred-repo-ids"] });
+      queryClient.invalidateQueries({ queryKey: ["starred-repos"] });
+      toast({ title: isStarred ? "Removed from stars" : "Added to stars" });
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -86,6 +121,7 @@ export default function Repos() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10"></TableHead>
               <TableHead>Name</TableHead>
               <TableHead className="hidden md:table-cell">Local Path</TableHead>
               <TableHead className="hidden lg:table-cell">Account</TableHead>
@@ -97,49 +133,63 @@ export default function Repos() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                   {repos.length === 0 ? "No repos found. Run git-sweepher scan to start." : "No matching repos."}
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((repo) => (
-                <TableRow key={repo.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-sm font-medium">{repo.name}</span>
-                      {!repo.exists_locally && (
-                        <Badge variant="outline" className="text-xs">deleted</Badge>
-                      )}
-                    </div>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <span className="font-mono text-xs text-muted-foreground">{repo.local_path || "—"}</span>
-                  </TableCell>
-                  <TableCell className="hidden lg:table-cell">
-                    <span className="text-sm">{repo.account || "—"}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={`text-xs ${statusColors[repo.sync_status] || ""}`}>
-                      {repo.sync_status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
-                    {repo.last_scan ? formatDistanceToNow(new Date(repo.last_scan), { addSuffix: true }) : "—"}
-                  </TableCell>
-                  <TableCell className="text-right hidden sm:table-cell">
-                    {repo.remote_url && (
-                      <a
-                        href={repo.remote_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center text-primary hover:underline"
+              filtered.map((repo) => {
+                const isStarred = starredRepoIds instanceof Set && starredRepoIds.has(repo.id);
+                return (
+                  <TableRow key={repo.id}>
+                    <TableCell className="pr-0">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7"
+                        onClick={() => toggleStar.mutate({ repoId: repo.id, isStarred })}
+                        disabled={toggleStar.isPending}
                       >
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
+                        <Star className={`h-4 w-4 ${isStarred ? "fill-warning text-warning" : "text-muted-foreground"}`} />
+                      </Button>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-medium">{repo.name}</span>
+                        {!repo.exists_locally && (
+                          <Badge variant="outline" className="text-xs">deleted</Badge>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <span className="font-mono text-xs text-muted-foreground">{repo.local_path || "—"}</span>
+                    </TableCell>
+                    <TableCell className="hidden lg:table-cell">
+                      <span className="text-sm">{repo.account || "—"}</span>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={`text-xs ${statusColors[repo.sync_status] || ""}`}>
+                        {repo.sync_status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
+                      {repo.last_scan ? formatDistanceToNow(new Date(repo.last_scan), { addSuffix: true }) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right hidden sm:table-cell">
+                      {repo.remote_url && (
+                        <a
+                          href={repo.remote_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center text-primary hover:underline"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                        </a>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
