@@ -27,15 +27,64 @@ interface TrendingRepo {
   owner_avatar: string | null;
 }
 
-const TOPICS = [
-  { value: "ai-ml", label: "AI / ML" },
-  { value: "web-dev", label: "Web Dev" },
-  { value: "devops", label: "DevOps" },
-  { value: "mobile", label: "Mobile" },
-  { value: "data-science", label: "Data Science" },
-  { value: "security", label: "Security" },
-  { value: "blockchain", label: "Blockchain" },
-  { value: "game-dev", label: "Game Dev" },
+const TOPIC_GROUPS = [
+  {
+    label: "AI & ML",
+    topics: [
+      { value: "ai-ml", label: "Machine Learning" },
+      { value: "llm", label: "LLMs" },
+      { value: "ai-agents", label: "AI Agents" },
+      { value: "ai-engineering", label: "AI Engineering" },
+      { value: "computer-vision", label: "Computer Vision" },
+      { value: "nlp", label: "NLP" },
+    ],
+  },
+  {
+    label: "Development",
+    topics: [
+      { value: "web-dev", label: "Web Dev" },
+      { value: "frontend", label: "Frontend" },
+      { value: "backend", label: "Backend" },
+      { value: "fullstack", label: "Fullstack" },
+      { value: "mobile", label: "Mobile" },
+      { value: "cli-tools", label: "CLI Tools" },
+    ],
+  },
+  {
+    label: "Infrastructure",
+    topics: [
+      { value: "devops", label: "DevOps" },
+      { value: "cloud", label: "Cloud" },
+      { value: "database", label: "Database" },
+      { value: "api", label: "APIs" },
+    ],
+  },
+  {
+    label: "Data & Science",
+    topics: [
+      { value: "data-science", label: "Data Science" },
+      { value: "data-engineering", label: "Data Eng" },
+    ],
+  },
+  {
+    label: "Security & Web3",
+    topics: [
+      { value: "security", label: "Security" },
+      { value: "blockchain", label: "Blockchain" },
+    ],
+  },
+  {
+    label: "Languages & Other",
+    topics: [
+      { value: "rust", label: "Rust" },
+      { value: "go", label: "Go" },
+      { value: "python", label: "Python" },
+      { value: "typescript", label: "TypeScript" },
+      { value: "game-dev", label: "Game Dev" },
+      { value: "tutorials", label: "Tutorials" },
+      { value: "awesome-lists", label: "Awesome Lists" },
+    ],
+  },
 ];
 
 const PERIODS = [
@@ -211,12 +260,17 @@ export default function Discover() {
         <div className="space-y-1.5">
           <Label className="text-xs text-muted-foreground">Topic</Label>
           <Select value={topic} onValueChange={setTopic}>
-            <SelectTrigger className="w-[160px]">
+            <SelectTrigger className="w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {TOPICS.map((t) => (
-                <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+              {TOPIC_GROUPS.map((group) => (
+                <div key={group.label}>
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">{group.label}</div>
+                  {group.topics.map((t) => (
+                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  ))}
+                </div>
               ))}
             </SelectContent>
           </Select>
