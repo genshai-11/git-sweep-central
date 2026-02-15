@@ -42,9 +42,16 @@ const steps = [
     description: "Cài đặt công cụ dòng lệnh Git-Sweepher trên máy tính.",
     content: (
       <div className="space-y-3">
-        <CodeBlock code="pip install git-sweepher" />
         <p className="text-sm text-muted-foreground">
-          Yêu cầu Python 3.8+ và pip. Kiểm tra cài đặt:
+          Cài đặt global qua npm:
+        </p>
+        <CodeBlock code="npm install -g git-sweepher" />
+        <p className="text-sm text-muted-foreground">
+          Hoặc chạy trực tiếp với npx (không cần cài):
+        </p>
+        <CodeBlock code="npx git-sweepher --help" />
+        <p className="text-sm text-muted-foreground">
+          Yêu cầu Node.js 18+. Kiểm tra cài đặt:
         </p>
         <CodeBlock code="git-sweepher --version" />
       </div>
