@@ -5,14 +5,20 @@ const corsHeaders = {
 };
 
 const TOPIC_QUERIES: Record<string, string> = {
-  "ai-ml": "artificial intelligence OR machine learning OR deep learning OR LLM",
-  "web-dev": "web framework OR frontend OR backend OR fullstack",
-  "devops": "devops OR kubernetes OR docker OR CI/CD OR infrastructure",
-  "mobile": "mobile app OR android OR ios OR react native OR flutter",
-  "data-science": "data science OR data analysis OR visualization OR pandas",
-  "security": "security OR cryptography OR vulnerability OR pentest",
-  "blockchain": "blockchain OR web3 OR smart contract OR cryptocurrency",
-  "game-dev": "game engine OR game development OR unity OR unreal",
+  "ai-ml": "machine-learning",
+  "web-dev": "react",
+  "devops": "kubernetes",
+  "mobile": "react-native",
+  "data-science": "data-science",
+  "security": "cybersecurity",
+  "blockchain": "blockchain",
+  "game-dev": "game-engine",
+};
+
+const PERIOD_MIN_STARS: Record<string, number> = {
+  daily: 100,
+  weekly: 500,
+  monthly: 200,
 };
 
 Deno.serve(async (req) => {
@@ -31,7 +37,7 @@ Deno.serve(async (req) => {
     let since: Date;
     switch (period) {
       case "daily":
-        since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        since = new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000);
         break;
       case "monthly":
         since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
@@ -43,8 +49,13 @@ Deno.serve(async (req) => {
     }
 
     const dateStr = since.toISOString().split("T")[0];
-    const topicQuery = TOPIC_QUERIES[topic] || topic;
-    const query = `${topicQuery} created:>${dateStr}`;
+    const minStars = PERIOD_MIN_STARS[period] || 500;
+    const topicKeyword = TOPIC_QUERIES[topic] || topic;
+
+    // Simple reliable query: topic + recent push + min stars
+    const query = `topic:${topicKeyword} pushed:>${dateStr} stars:>=${minStars}`;
+
+    console.log("Search query:", query);
 
     const ghResponse = await fetch(
       `https://api.github.com/search/repositories?q=${encodeURIComponent(query)}&sort=stars&order=desc&page=${page}&per_page=${perPage}`,
