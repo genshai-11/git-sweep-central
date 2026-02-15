@@ -5,14 +5,39 @@ const corsHeaders = {
 };
 
 const TOPIC_QUERIES: Record<string, string> = {
+  // AI & ML
   "ai-ml": "machine-learning",
+  "llm": "large-language-model",
+  "ai-agents": "ai-agent",
+  "ai-engineering": "ai",
+  "computer-vision": "computer-vision",
+  "nlp": "natural-language-processing",
+  // Development
   "web-dev": "react",
-  "devops": "kubernetes",
+  "frontend": "frontend",
+  "backend": "backend",
+  "fullstack": "fullstack",
   "mobile": "react-native",
+  "cli-tools": "command-line",
+  // Infrastructure
+  "devops": "kubernetes",
+  "cloud": "cloud-native",
+  "database": "database",
+  "api": "api",
+  // Data & Science
   "data-science": "data-science",
+  "data-engineering": "data-engineering",
+  // Security & Infra
   "security": "cybersecurity",
   "blockchain": "blockchain",
+  // Other
   "game-dev": "game-engine",
+  "rust": "rust",
+  "go": "golang",
+  "python": "python",
+  "typescript": "typescript",
+  "tutorials": "tutorial",
+  "awesome-lists": "awesome",
 };
 
 const PERIOD_MIN_STARS: Record<string, number> = {
