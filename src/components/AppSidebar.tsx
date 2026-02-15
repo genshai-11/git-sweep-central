@@ -1,4 +1,4 @@
-import { LayoutDashboard, GitBranch, Star, History, LogOut } from "lucide-react";
+import { LayoutDashboard, GitBranch, Star, History, LogOut, TrendingUp } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -6,6 +6,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 const navItems = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/repos", icon: GitBranch, label: "Repositories" },
+  { to: "/discover", icon: TrendingUp, label: "Discover" },
   { to: "/stars", icon: Star, label: "Stars Gallery" },
   { to: "/history", icon: History, label: "History" },
 ];

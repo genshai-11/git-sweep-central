@@ -1,1 +1,4 @@
 project_id = "gnhxotxraytofdvqjrjs"
+
+[functions.fetch-trending]
+verify_jwt = false
