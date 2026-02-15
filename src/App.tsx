@@ -10,6 +10,7 @@ import Index from "./pages/Index";
 import Repos from "./pages/Repos";
 import Stars from "./pages/Stars";
 import HistoryPage from "./pages/HistoryPage";
+import Discover from "./pages/Discover";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -35,6 +36,7 @@ const App = () => (
               <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
                 <Route path="/" element={<Index />} />
                 <Route path="/repos" element={<Repos />} />
+                <Route path="/discover" element={<Discover />} />
                 <Route path="/stars" element={<Stars />} />
                 <Route path="/history" element={<HistoryPage />} />
               </Route>
