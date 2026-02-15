@@ -199,15 +199,15 @@ export default function Discover() {
   const trendingRepos: TrendingRepo[] = trendingData?.repos || [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold">Discover</h1>
-          <p className="text-sm text-muted-foreground">Trending repos & save awesome finds</p>
+          <h1 className="text-xl sm:text-2xl font-bold">Discover</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Trending repos & save awesome finds</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" className="w-full sm:w-auto">
               <Plus className="mr-1.5 h-4 w-4" />
               Add Repo Manually
             </Button>
@@ -310,7 +310,7 @@ export default function Discover() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {trendingRepos.map((repo) => {
             const isSaved = starredRepoUrls instanceof Set && starredRepoUrls.has(repo.url);
             return (
