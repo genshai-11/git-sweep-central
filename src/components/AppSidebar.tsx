@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LayoutDashboard, GitBranch, Star, History, LogOut, TrendingUp, Menu, X } from "lucide-react";
+import { LayoutDashboard, GitBranch, Star, History, LogOut, TrendingUp, Menu, X, BookOpen } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { useAuth } from "@/hooks/useAuth";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -12,6 +12,7 @@ const navItems = [
   { to: "/discover", icon: TrendingUp, label: "Discover" },
   { to: "/stars", icon: Star, label: "Stars Gallery" },
   { to: "/history", icon: History, label: "History" },
+  { to: "/getting-started", icon: BookOpen, label: "Getting Started" },
 ];
 
 function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {

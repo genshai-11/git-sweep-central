@@ -11,6 +11,7 @@ import Repos from "./pages/Repos";
 import Stars from "./pages/Stars";
 import HistoryPage from "./pages/HistoryPage";
 import Discover from "./pages/Discover";
+import GettingStarted from "./pages/GettingStarted";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -39,6 +40,7 @@ const App = () => (
                 <Route path="/discover" element={<Discover />} />
                 <Route path="/stars" element={<Stars />} />
                 <Route path="/history" element={<HistoryPage />} />
+                <Route path="/getting-started" element={<GettingStarted />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

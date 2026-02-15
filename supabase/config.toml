@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.search-repos]
 verify_jwt = false
+
+[functions.cli-sync]
+verify_jwt = false
