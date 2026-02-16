@@ -42,6 +42,60 @@ program
   .action(scanCommand);
 
 program
+  .command("scan-all")
+  .description("Scan ALL common project directories on your computer")
+  .option("-d, --max-depth <n>", "Max depth for recursive scan", "5")
+  .action(async (options) => {
+    const os = await import("node:os");
+    const { existsSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const home = os.homedir();
+
+    // Common project directories
+    const candidates = [
+      join(home, "Projects"),
+      join(home, "projects"),
+      join(home, "Developer"),
+      join(home, "dev"),
+      join(home, "Dev"),
+      join(home, "Code"),
+      join(home, "code"),
+      join(home, "workspace"),
+      join(home, "Workspace"),
+      join(home, "repos"),
+      join(home, "Repos"),
+      join(home, "src"),
+      join(home, "git"),
+      join(home, "GitHub"),
+      join(home, "Documents", "Projects"),
+      join(home, "Documents", "GitHub"),
+      join(home, "Desktop"),
+    ];
+
+    const existing = candidates.filter((p) => {
+      try { return existsSync(p); } catch { return false; }
+    });
+
+    if (existing.length === 0) {
+      console.log(chalk.yellow("\n⚠  No common project directories found. Try: git-sweepher scan <path>"));
+      return;
+    }
+
+    console.log(chalk.bold(`\n🔍 Scanning ${existing.length} directories on your computer...\n`));
+    for (const dir of existing) {
+      console.log(chalk.dim(`  → ${dir}`));
+    }
+    console.log("");
+
+    // Scan each directory
+    for (const dir of existing) {
+      await scanCommand(dir, { maxDepth: options.maxDepth, recursive: true });
+    }
+
+    console.log(chalk.green.bold("\n✅ Full scan complete!\n"));
+  });
+
+program
   .command("push")
   .description("Push a repository to its remote")
   .argument("<repo>", "Repository name or path")

@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Star, Plus } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, ExternalLink, Star, Plus, RefreshCw, Terminal, Copy, Check } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { AddRepoDialog, REPO_CATEGORIES } from "@/components/AddRepoDialog";
@@ -25,9 +26,29 @@ export default function Repos() {
   const [accountFilter, setAccountFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const [copiedCmd, setCopiedCmd] = useState<string | null>(null);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const refreshData = () => {
+    queryClient.invalidateQueries({ queryKey: ["repositories"] });
+    queryClient.invalidateQueries({ queryKey: ["starred-repo-ids"] });
+    toast({ title: "Data refreshed" });
+  };
+
+  const copyCommand = (cmd: string) => {
+    navigator.clipboard.writeText(cmd);
+    setCopiedCmd(cmd);
+    setTimeout(() => setCopiedCmd(null), 2000);
+  };
+
+  const syncCommands = [
+    { label: "Scan all projects", cmd: "npx git-sweepher scan-all", desc: "Tự động tìm tất cả repos trong các thư mục phổ biến" },
+    { label: "Scan thư mục cụ thể", cmd: "npx git-sweepher scan ~/Projects", desc: "Scan một thư mục cụ thể" },
+    { label: "Scan toàn bộ Home", cmd: "npx git-sweepher scan ~/ -d 8", desc: "Scan toàn bộ thư mục home (chậm hơn)" },
+  ];
 
   const { data: repos = [] } = useQuery({
     queryKey: ["repositories"],
@@ -93,9 +114,17 @@ export default function Repos() {
           <h1 className="text-2xl font-bold">Repositories</h1>
           <p className="text-sm text-muted-foreground">{repos.length} repos tracked</p>
         </div>
-        <Button onClick={() => setAddDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Add Repo
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => { refreshData(); }}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Refresh
+          </Button>
+          <Button variant="secondary" onClick={() => setSyncDialogOpen(true)}>
+            <Terminal className="mr-2 h-4 w-4" /> Sync from CLI
+          </Button>
+          <Button onClick={() => setAddDialogOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Add Repo
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -222,6 +251,43 @@ export default function Repos() {
       </div>
 
       <AddRepoDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} savedRepoUrls={savedRepoUrls} />
+
+      {/* Sync CLI Dialog */}
+      <Dialog open={syncDialogOpen} onOpenChange={setSyncDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Terminal className="h-5 w-5" /> Sync Repositories from CLI
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Chạy lệnh bên dưới trong terminal để scan và đồng bộ tất cả repos từ máy tính lên dashboard.
+          </p>
+          <div className="space-y-3 mt-2">
+            {syncCommands.map(({ label, cmd, desc }) => (
+              <div key={cmd} className="rounded-lg border p-3 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">{label}</span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => copyCommand(cmd)}
+                  >
+                    {copiedCmd === cmd ? <Check className="h-3.5 w-3.5 text-success" /> : <Copy className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
+                <code className="block text-xs font-mono bg-muted rounded px-2 py-1.5 select-all">{cmd}</code>
+                <p className="text-xs text-muted-foreground">{desc}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-2 rounded-lg bg-muted/50 p-3 text-xs text-muted-foreground space-y-1">
+            <p><strong>Lần đầu?</strong> Chạy <code className="bg-muted px-1 rounded">npx git-sweepher login</code> trước để đăng nhập.</p>
+            <p>Sau khi scan xong, nhấn <strong>Refresh</strong> để cập nhật dashboard.</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
