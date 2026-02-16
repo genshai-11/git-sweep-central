@@ -2,15 +2,28 @@ import { useState, useEffect, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Star, Plus, Loader2, Search, GitFork, ExternalLink, ArrowLeft } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Star, Loader2, Search, GitFork, ExternalLink, ArrowLeft, FolderPlus, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+
+export const REPO_CATEGORIES = [
+  "uncategorized",
+  "work",
+  "personal",
+  "open-source",
+  "learning",
+  "archive",
+  "client",
+  "experiment",
+] as const;
 
 interface SearchRepo {
   github_id: number;
@@ -36,17 +49,25 @@ export function AddRepoDialog({ open, onOpenChange, savedRepoUrls }: AddRepoDial
   const [isSearching, setIsSearching] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<SearchRepo | null>(null);
   const [personalNotes, setPersonalNotes] = useState("");
+  const [category, setCategory] = useState("uncategorized");
+  const [tagInput, setTagInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
+
+  // Manual form
+  const [manualName, setManualName] = useState("");
+  const [manualPath, setManualPath] = useState("");
+  const [manualRemoteUrl, setManualRemoteUrl] = useState("");
+  const [manualAccount, setManualAccount] = useState("");
+
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Debounced search
   useEffect(() => {
     if (!searchQuery.trim() || searchQuery.trim().length < 2) {
       setSearchResults([]);
       return;
     }
-
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
@@ -64,11 +85,17 @@ export function AddRepoDialog({ open, onOpenChange, savedRepoUrls }: AddRepoDial
         setIsSearching(false);
       }
     }, 400);
-
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const saveRepo = useMutation({
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["starred-repo-urls"] });
+    queryClient.invalidateQueries({ queryKey: ["starred-repos"] });
+    queryClient.invalidateQueries({ queryKey: ["starred-repo-ids"] });
+    queryClient.invalidateQueries({ queryKey: ["repositories"] });
+  };
+
+  const saveSearchRepo = useMutation({
     mutationFn: async (repo: SearchRepo) => {
       const { data: repoData, error: repoErr } = await supabase
         .from("repositories")
@@ -78,6 +105,8 @@ export function AddRepoDialog({ open, onOpenChange, savedRepoUrls }: AddRepoDial
           remote_url: repo.url,
           sync_status: "unknown" as const,
           exists_locally: false,
+          category,
+          tags,
         })
         .select()
         .single();
@@ -88,16 +117,13 @@ export function AddRepoDialog({ open, onOpenChange, savedRepoUrls }: AddRepoDial
         repo_id: repoData.id,
         description: repo.description || null,
         language: repo.language || null,
-        tags: repo.topics || [],
+        tags: [...(repo.topics || []), ...tags],
         personal_notes: personalNotes || null,
       });
       if (starErr) throw starErr;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["starred-repo-urls"] });
-      queryClient.invalidateQueries({ queryKey: ["starred-repos"] });
-      queryClient.invalidateQueries({ queryKey: ["starred-repo-ids"] });
-      queryClient.invalidateQueries({ queryKey: ["repositories"] });
+      invalidateAll();
       toast({ title: "Saved to Stars Gallery!" });
       handleReset();
     },
@@ -106,17 +132,99 @@ export function AddRepoDialog({ open, onOpenChange, savedRepoUrls }: AddRepoDial
     },
   });
 
+  const saveManualRepo = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("repositories").insert({
+        user_id: user!.id,
+        name: manualName.trim(),
+        local_path: manualPath.trim() || null,
+        remote_url: manualRemoteUrl.trim() || null,
+        account: manualAccount.trim() || null,
+        sync_status: "unknown" as const,
+        exists_locally: !!manualPath.trim(),
+        category,
+        tags,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      invalidateAll();
+      toast({ title: "Repository added!" });
+      handleReset();
+      onOpenChange(false);
+    },
+    onError: (err: Error) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const addTag = () => {
+    const t = tagInput.trim().toLowerCase();
+    if (t && !tags.includes(t)) {
+      setTags([...tags, t]);
+    }
+    setTagInput("");
+  };
+
+  const removeTag = (t: string) => setTags(tags.filter((x) => x !== t));
+
   const handleReset = useCallback(() => {
     setSearchQuery("");
     setSearchResults([]);
     setSelectedRepo(null);
     setPersonalNotes("");
+    setCategory("uncategorized");
+    setTagInput("");
+    setTags([]);
+    setManualName("");
+    setManualPath("");
+    setManualRemoteUrl("");
+    setManualAccount("");
   }, []);
 
   const handleClose = (val: boolean) => {
     if (!val) handleReset();
     onOpenChange(val);
   };
+
+  const categoryTagsSection = (
+    <div className="space-y-3">
+      <div className="space-y-1.5">
+        <Label className="text-xs">Category</Label>
+        <Select value={category} onValueChange={setCategory}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {REPO_CATEGORIES.map((c) => (
+              <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-xs">Tags</Label>
+        <div className="flex gap-2">
+          <Input
+            placeholder="Add tag..."
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
+            className="flex-1"
+          />
+          <Button type="button" variant="outline" size="sm" onClick={addTag}>Add</Button>
+        </div>
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {tags.map((t) => (
+              <Badge key={t} variant="secondary" className="text-xs gap-1">
+                {t}
+                <button onClick={() => removeTag(t)}><X className="h-2.5 w-2.5" /></button>
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -128,130 +236,133 @@ export function AddRepoDialog({ open, onOpenChange, savedRepoUrls }: AddRepoDial
                 <ArrowLeft className="h-4 w-4" />
               </Button>
             )}
-            {selectedRepo ? "Save Repo" : "Find a Repo"}
+            {selectedRepo ? "Save Repo" : "Add Repository"}
           </DialogTitle>
         </DialogHeader>
 
         {!selectedRepo ? (
-          <div className="flex flex-col flex-1 min-h-0 px-5 pb-5">
-            {/* Search input */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search repos or paste a GitHub URL..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                autoFocus
-              />
-            </div>
+          <Tabs defaultValue="search" className="flex flex-col flex-1 min-h-0 px-5 pb-5">
+            <TabsList className="grid w-full grid-cols-2 mb-3">
+              <TabsTrigger value="search"><Search className="h-3.5 w-3.5 mr-1.5" />Search GitHub</TabsTrigger>
+              <TabsTrigger value="manual"><FolderPlus className="h-3.5 w-3.5 mr-1.5" />Add Manually</TabsTrigger>
+            </TabsList>
 
-            {/* Results */}
-            <ScrollArea className="flex-1 mt-3 -mx-1">
-              {isSearching ? (
-                <div className="flex items-center justify-center py-8">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                  <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
-                </div>
-              ) : searchResults.length > 0 ? (
-                <div className="space-y-1 px-1">
-                  {searchResults.map((repo) => {
-                    const isSaved = savedRepoUrls.has(repo.url);
-                    return (
-                      <button
-                        key={repo.github_id}
-                        className="w-full text-left rounded-lg border border-transparent p-3 transition-colors hover:bg-accent hover:border-border disabled:opacity-50"
-                        disabled={isSaved}
-                        onClick={() => setSelectedRepo(repo)}
-                      >
-                        <div className="flex items-start gap-3">
-                          {repo.owner_avatar && (
-                            <img src={repo.owner_avatar} alt="" className="h-8 w-8 rounded-md flex-shrink-0" />
-                          )}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm font-mono font-medium truncate">{repo.name}</span>
-                              {isSaved && <Badge variant="secondary" className="text-[10px] shrink-0">Saved</Badge>}
-                            </div>
-                            {repo.description && (
-                              <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{repo.description}</p>
+            <TabsContent value="search" className="flex flex-col flex-1 min-h-0 mt-0">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search repos or paste a GitHub URL..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              <ScrollArea className="flex-1 mt-3 -mx-1">
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div className="space-y-1 px-1">
+                    {searchResults.map((repo) => {
+                      const isSaved = savedRepoUrls.has(repo.url);
+                      return (
+                        <button
+                          key={repo.github_id}
+                          className="w-full text-left rounded-lg border border-transparent p-3 transition-colors hover:bg-accent hover:border-border disabled:opacity-50"
+                          disabled={isSaved}
+                          onClick={() => setSelectedRepo(repo)}
+                        >
+                          <div className="flex items-start gap-3">
+                            {repo.owner_avatar && (
+                              <img src={repo.owner_avatar} alt="" className="h-8 w-8 rounded-md flex-shrink-0" />
                             )}
-                            <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-0.5">
-                                <Star className="h-3 w-3" /> {repo.stars.toLocaleString()}
-                              </span>
-                              <span className="flex items-center gap-0.5">
-                                <GitFork className="h-3 w-3" /> {repo.forks.toLocaleString()}
-                              </span>
-                              {repo.language && <Badge variant="outline" className="text-[10px] py-0">{repo.language}</Badge>}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-mono font-medium truncate">{repo.name}</span>
+                                {isSaved && <Badge variant="secondary" className="text-[10px] shrink-0">Saved</Badge>}
+                              </div>
+                              {repo.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{repo.description}</p>
+                              )}
+                              <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-0.5"><Star className="h-3 w-3" /> {repo.stars.toLocaleString()}</span>
+                                <span className="flex items-center gap-0.5"><GitFork className="h-3 w-3" /> {repo.forks.toLocaleString()}</span>
+                                {repo.language && <Badge variant="outline" className="text-[10px] py-0">{repo.language}</Badge>}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : searchQuery.trim().length >= 2 && !isSearching ? (
-                <p className="text-center text-sm text-muted-foreground py-8">No repos found. Try a different search.</p>
-              ) : (
-                <div className="text-center py-8 space-y-1">
-                  <Search className="mx-auto h-8 w-8 text-muted-foreground/40" />
-                  <p className="text-sm text-muted-foreground">Search by name or paste a GitHub URL</p>
-                </div>
-              )}
-            </ScrollArea>
-          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : searchQuery.trim().length >= 2 ? (
+                  <p className="text-center text-sm text-muted-foreground py-8">No repos found.</p>
+                ) : (
+                  <div className="text-center py-8 space-y-1">
+                    <Search className="mx-auto h-8 w-8 text-muted-foreground/40" />
+                    <p className="text-sm text-muted-foreground">Search by name or paste a GitHub URL</p>
+                  </div>
+                )}
+              </ScrollArea>
+            </TabsContent>
+
+            <TabsContent value="manual" className="mt-0 space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Repository Name *</Label>
+                <Input placeholder="my-project" value={manualName} onChange={(e) => setManualName(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Local Path</Label>
+                <Input placeholder="/home/user/projects/my-project" value={manualPath} onChange={(e) => setManualPath(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Remote URL</Label>
+                <Input placeholder="https://github.com/user/repo" value={manualRemoteUrl} onChange={(e) => setManualRemoteUrl(e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Account</Label>
+                <Input placeholder="github/username" value={manualAccount} onChange={(e) => setManualAccount(e.target.value)} />
+              </div>
+              {categoryTagsSection}
+              <Button
+                onClick={() => saveManualRepo.mutate()}
+                disabled={!manualName.trim() || saveManualRepo.isPending}
+                className="w-full"
+              >
+                {saveManualRepo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FolderPlus className="mr-2 h-4 w-4" />}
+                Add Repository
+              </Button>
+            </TabsContent>
+          </Tabs>
         ) : (
-          /* Selected repo detail / save form */
           <div className="px-5 pb-5 space-y-4">
             <div className="flex items-start gap-3 rounded-lg border p-3 bg-muted/30">
-              {selectedRepo.owner_avatar && (
-                <img src={selectedRepo.owner_avatar} alt="" className="h-10 w-10 rounded-md" />
-              )}
+              {selectedRepo.owner_avatar && <img src={selectedRepo.owner_avatar} alt="" className="h-10 w-10 rounded-md" />}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-mono font-semibold truncate">{selectedRepo.name}</p>
-                {selectedRepo.description && (
-                  <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{selectedRepo.description}</p>
-                )}
+                {selectedRepo.description && <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5">{selectedRepo.description}</p>}
                 <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-0.5">
-                    <Star className="h-3 w-3" /> {selectedRepo.stars.toLocaleString()}
-                  </span>
-                  <span className="flex items-center gap-0.5">
-                    <GitFork className="h-3 w-3" /> {selectedRepo.forks.toLocaleString()}
-                  </span>
+                  <span className="flex items-center gap-0.5"><Star className="h-3 w-3" /> {selectedRepo.stars.toLocaleString()}</span>
+                  <span className="flex items-center gap-0.5"><GitFork className="h-3 w-3" /> {selectedRepo.forks.toLocaleString()}</span>
                   {selectedRepo.language && <Badge variant="secondary" className="text-[10px]">{selectedRepo.language}</Badge>}
-                  <a href={selectedRepo.url} target="_blank" rel="noopener noreferrer" className="ml-auto hover:text-foreground">
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                  <a href={selectedRepo.url} target="_blank" rel="noopener noreferrer" className="ml-auto hover:text-foreground"><ExternalLink className="h-3 w-3" /></a>
                 </div>
               </div>
             </div>
-
             {selectedRepo.topics.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {selectedRepo.topics.slice(0, 8).map((t) => (
-                  <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
-                ))}
+                {selectedRepo.topics.slice(0, 8).map((t) => <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>)}
               </div>
             )}
-
+            {categoryTagsSection}
             <div className="space-y-2">
               <Label className="text-xs">Personal Notes (optional)</Label>
-              <Textarea
-                placeholder="Why is this repo awesome? Your notes..."
-                value={personalNotes}
-                onChange={(e) => setPersonalNotes(e.target.value)}
-                rows={3}
-              />
+              <Textarea placeholder="Why is this repo awesome?" value={personalNotes} onChange={(e) => setPersonalNotes(e.target.value)} rows={2} />
             </div>
-
-            <Button
-              onClick={() => saveRepo.mutate(selectedRepo)}
-              disabled={saveRepo.isPending}
-              className="w-full"
-            >
-              {saveRepo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4" />}
+            <Button onClick={() => saveSearchRepo.mutate(selectedRepo)} disabled={saveSearchRepo.isPending} className="w-full">
+              {saveSearchRepo.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Star className="mr-2 h-4 w-4" />}
               Save to Stars
             </Button>
           </div>
