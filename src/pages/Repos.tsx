@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, ExternalLink, Star } from "lucide-react";
+import { Search, ExternalLink, Star, Plus } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { AddRepoDialog, REPO_CATEGORIES } from "@/components/AddRepoDialog";
 
 const statusColors: Record<string, string> = {
   synced: "bg-success text-success-foreground",
@@ -22,6 +23,8 @@ export default function Repos() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [accountFilter, setAccountFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -41,6 +44,15 @@ export default function Repos() {
       const { data, error } = await supabase.from("starred_repos").select("repo_id");
       if (error) throw error;
       return new Set(data.map((s) => s.repo_id));
+    },
+  });
+
+  const { data: savedRepoUrls = new Set<string>() } = useQuery({
+    queryKey: ["starred-repo-urls"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("repositories").select("remote_url");
+      if (error) throw error;
+      return new Set(data.map((r) => r.remote_url).filter(Boolean) as string[]);
     },
   });
 
@@ -70,27 +82,39 @@ export default function Repos() {
     if (search && !r.name.toLowerCase().includes(search.toLowerCase())) return false;
     if (statusFilter !== "all" && r.sync_status !== statusFilter) return false;
     if (accountFilter !== "all" && r.account !== accountFilter) return false;
+    if (categoryFilter !== "all" && (r as any).category !== categoryFilter) return false;
     return true;
   });
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Repositories</h1>
-        <p className="text-sm text-muted-foreground">{repos.length} repos scanned</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Repositories</h1>
+          <p className="text-sm text-muted-foreground">{repos.length} repos tracked</p>
+        </div>
+        <Button onClick={() => setAddDialogOpen(true)}>
+          <Plus className="mr-2 h-4 w-4" /> Add Repo
+        </Button>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search repos..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
+          <Input placeholder="Search repos..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
         </div>
+        <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <SelectTrigger className="w-[150px]">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            {REPO_CATEGORIES.map((c) => (
+              <SelectItem key={c} value={c} className="capitalize">{c}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="Status" />
@@ -123,6 +147,7 @@ export default function Repos() {
             <TableRow>
               <TableHead className="w-10"></TableHead>
               <TableHead>Name</TableHead>
+              <TableHead className="hidden md:table-cell">Category</TableHead>
               <TableHead className="hidden md:table-cell">Local Path</TableHead>
               <TableHead className="hidden lg:table-cell">Account</TableHead>
               <TableHead>Status</TableHead>
@@ -133,8 +158,8 @@ export default function Repos() {
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                  {repos.length === 0 ? "No repos found. Run git-sweepher scan to start." : "No matching repos."}
+                <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                  {repos.length === 0 ? "No repos found. Add one or run CLI scan." : "No matching repos."}
                 </TableCell>
               </TableRow>
             ) : (
@@ -156,10 +181,18 @@ export default function Repos() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-sm font-medium">{repo.name}</span>
-                        {!repo.exists_locally && (
-                          <Badge variant="outline" className="text-xs">deleted</Badge>
+                        {!repo.exists_locally && <Badge variant="outline" className="text-xs">deleted</Badge>}
+                        {((repo as any).tags || []).length > 0 && (
+                          <div className="hidden lg:flex gap-1">
+                            {((repo as any).tags as string[]).slice(0, 2).map((t) => (
+                              <Badge key={t} variant="outline" className="text-[10px]">{t}</Badge>
+                            ))}
+                          </div>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell">
+                      <Badge variant="secondary" className="text-xs capitalize">{(repo as any).category || "uncategorized"}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
                       <span className="font-mono text-xs text-muted-foreground">{repo.local_path || "—"}</span>
@@ -168,21 +201,14 @@ export default function Repos() {
                       <span className="text-sm">{repo.account || "—"}</span>
                     </TableCell>
                     <TableCell>
-                      <Badge className={`text-xs ${statusColors[repo.sync_status] || ""}`}>
-                        {repo.sync_status}
-                      </Badge>
+                      <Badge className={`text-xs ${statusColors[repo.sync_status] || ""}`}>{repo.sync_status}</Badge>
                     </TableCell>
                     <TableCell className="hidden md:table-cell text-sm text-muted-foreground">
                       {repo.last_scan ? formatDistanceToNow(new Date(repo.last_scan), { addSuffix: true }) : "—"}
                     </TableCell>
                     <TableCell className="text-right hidden sm:table-cell">
                       {repo.remote_url && (
-                        <a
-                          href={repo.remote_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center text-primary hover:underline"
-                        >
+                        <a href={repo.remote_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-primary hover:underline">
                           <ExternalLink className="h-3.5 w-3.5" />
                         </a>
                       )}
@@ -194,6 +220,8 @@ export default function Repos() {
           </TableBody>
         </Table>
       </div>
+
+      <AddRepoDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} savedRepoUrls={savedRepoUrls} />
     </div>
   );
 }

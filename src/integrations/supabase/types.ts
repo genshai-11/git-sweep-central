@@ -82,6 +82,7 @@ export type Database = {
       repositories: {
         Row: {
           account: string | null
+          category: string | null
           created_at: string
           exists_locally: boolean | null
           id: string
@@ -91,11 +92,13 @@ export type Database = {
           remote_url: string | null
           size_bytes: number | null
           sync_status: Database["public"]["Enums"]["sync_status"]
+          tags: string[] | null
           updated_at: string
           user_id: string
         }
         Insert: {
           account?: string | null
+          category?: string | null
           created_at?: string
           exists_locally?: boolean | null
           id?: string
@@ -105,11 +108,13 @@ export type Database = {
           remote_url?: string | null
           size_bytes?: number | null
           sync_status?: Database["public"]["Enums"]["sync_status"]
+          tags?: string[] | null
           updated_at?: string
           user_id: string
         }
         Update: {
           account?: string | null
+          category?: string | null
           created_at?: string
           exists_locally?: boolean | null
           id?: string
@@ -119,6 +124,7 @@ export type Database = {
           remote_url?: string | null
           size_bytes?: number | null
           sync_status?: Database["public"]["Enums"]["sync_status"]
+          tags?: string[] | null
           updated_at?: string
           user_id?: string
         }
